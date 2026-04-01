@@ -68,6 +68,8 @@
 !closure_ea/dna/**
 !closure_ea/vm/
 !closure_ea/vm/**
+!closure_ea/generation/
+!closure_ea/generation/**
 !closure_ea/enkidu_alive/
 !closure_ea/enkidu_alive/**
 !closure_ea/archive/
