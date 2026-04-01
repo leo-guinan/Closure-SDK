@@ -31,12 +31,14 @@ mod primitives;
 mod program;
 mod machine;
 mod hierarchy;
+pub mod generation;
 
 pub use closure_rs::groups::sphere::IDENTITY;
 pub use primitives::{DecomposeResult, decompose, StepResult};
 pub use program::Program;
 pub use machine::Machine;
 pub use hierarchy::{HierarchicalMachine, ResonanceConfig};
+pub use generation::{Genome, LearnResult, GenerateResult, learn, generate};
 
 // ── Tests ───────────────────────────────────────────────────────────
 
