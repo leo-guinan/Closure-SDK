@@ -63,6 +63,10 @@
 !closure_cli/reader.py
 !closure_cli/seeker.py
 
+# ─── arc_oracle (ARC-AGI-3 relational oracle) ────────────────────────
+!arc_oracle/
+!arc_oracle/**
+
 # ─── closure_ea (computer umbrella: dna + vm + demos) ───────────────
 !closure_ea/
 !closure_ea/README.md
