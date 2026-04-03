@@ -460,8 +460,28 @@ def encode_from_frame(
         # Fully static frame — treat as start state
         self_x, self_y = 32.0, 32.0
     else:
-        self_x = float(sum(p[0] for p in entity_pixels)) / len(entity_pixels)
-        self_y = float(sum(p[1] for p in entity_pixels)) / len(entity_pixels)
+        # Group by color value and find the smallest cluster (likely the player)
+        import numpy as np
+        _frame = frame if hasattr(frame, '__len__') else None
+        if _frame is not None and len(getattr(_frame, 'shape', [])) >= 2:
+            _bg = background or set()
+            _clusters = {}
+            for y in range(_frame.shape[0]):
+                for x in range(_frame.shape[1]):
+                    v = int(_frame[y, x])
+                    if (x, y) not in _bg and v > 0:
+                        _clusters.setdefault(v, []).append((x, y))
+            if _clusters:
+                # Smallest non-background cluster = most likely player/active entity
+                _smallest = min(_clusters.values(), key=len)
+                self_x = float(sum(p[0] for p in _smallest)) / len(_smallest)
+                self_y = float(sum(p[1] for p in _smallest)) / len(_smallest)
+            else:
+                self_x = float(sum(p[0] for p in entity_pixels)) / len(entity_pixels)
+                self_y = float(sum(p[1] for p in entity_pixels)) / len(entity_pixels)
+        else:
+            self_x = float(sum(p[0] for p in entity_pixels)) / len(entity_pixels)
+            self_y = float(sum(p[1] for p in entity_pixels)) / len(entity_pixels)
 
     if win_signature:
         goal_x = float(sum(p[0] for p in win_signature)) / len(win_signature)

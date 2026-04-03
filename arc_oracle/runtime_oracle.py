@@ -231,10 +231,11 @@ class RuntimeOracle:
 
         # Cross-game fallback: self_word only, looser threshold
         # Only useful for near-goal states (clustering confirmed in normalized_encoder.py)
+        # Always filter by level to prevent L1 plan being used for L2+
         if hit is None:
             hit = self.dna.query(
                 state,
-                level=None,
+                level=self._current_level,
                 threshold=CROSS_GAME_MATCH_THRESHOLD,
                 use_full_sigma=False,
             )
