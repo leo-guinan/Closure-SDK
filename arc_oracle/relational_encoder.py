@@ -1,6 +1,30 @@
 """
 relational_encoder.py — Self / Others / World word encoder for ARC-AGI-3
 
+WALTER'S UPDATE (c8366a3)
+--------------------------
+Walter added VerificationCell / VerificationWord / VerificationArithmetic to the VM
+with full DNA persistence via WordMemory. Our RelCell/RelWord here mirror that
+structure exactly:
+
+  Walter's VerificationCell  →  our RelCell (plane_axis, phase, turns)
+  Walter's VerificationWord  →  our RelWord (list of RelCells)
+  Walter's WordMemory.save   →  our GameDNA.store (JSON now, WordMemory later)
+
+When pyo3 bindings ship, the swap is:
+  RelCell(axis, phase, turns) → VerificationCell.from_phase_and_turns(plane, phase, turns)
+  RelWord.word_sigma()        → VerificationArithmetic.subtract_words() + sigma on result
+  GameDNA.store()             → WordMemory.save_word(table, word_id, word)
+  GameDNA.query()             → WordMemory.load_word() + word-distance scan
+
+KEY NEW PRIMITIVE: subtract_words + sigma
+Walter's VerificationArithmetic.subtract_words(a, b) computes the geometric difference
+as a VerificationWord where each cell's phase = a_phase - b_phase and turns track
+borrowing. sigma of the result word's geometry() gives a proper S³ distance.
+This is strictly better than our current sum-of-cell-sigmas approximation.
+We document the upgrade path here but use the Python approximation until bindings exist.
+
+
 DESIGN
 ------
 A game state is encoded as three VerificationWords:

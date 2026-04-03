@@ -1,6 +1,21 @@
 """
 offline_trainer.py — Build DNA tables from confirmed plans and offline BFS
 
+WALTER'S UPDATE (c8366a3) — WordMemory
+---------------------------------------
+Walter added WordMemory with a DNA-backed table schema that stores VerificationWords:
+  word_id, cell_index, plane_x/y/z, phase, turns, coherence_width,
+  coupling_strength, coupling_phase_bias
+
+Our GameDNA JSON store is a direct analog. The upgrade path when pyo3 ships:
+  GameDNA.store(state, actions) → WordMemory.save_word(table, word_id, state.to_verification_word())
+  GameDNA.query(state)          → WordMemory.load_word(table, nearest_id) via resonance scan
+
+The word_id key in WordMemory maps to our (game_id, level, action_hash) tuple.
+DNA's content-addressed search (resonance_scan) replaces our word_sigma loop.
+This is the correct final architecture. JSON is the bridge until bindings exist.
+
+
 WHAT IT DOES
 ------------
 For each confirmed plan, stores a (start_state_word, action_sequence) pair in a

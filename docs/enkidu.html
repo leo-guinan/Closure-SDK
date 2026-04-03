@@ -36,6 +36,24 @@ button:hover { background: #444; }
 .ex-map { font-size: 11px; color: #999; line-height: 1.8; }
 .ex-map span.fep { color: #8ac; }
 .ex-map span.enk { color: #d4aa50; }
+@media (max-width: 900px) {
+  body { padding: 14px; }
+  .main { flex-direction: column; gap: 20px; }
+  .sim-col, .explain-col { width: 100%; }
+  .explain-col { max-width: none; }
+  canvas#grid { width: min(100%, 92vw); height: auto; }
+  #eventlog { width: min(100%, 92vw) !important; }
+  .panel { flex-direction: column; gap: 10px; width: min(100%, 92vw); }
+  .bar-wrap { width: 100%; }
+  .controls { flex-wrap: wrap; }
+}
+@media (max-width: 560px) {
+  body { padding: 10px; }
+  .sub { font-size: 10px; }
+  .controls { gap: 6px; }
+  button { padding: 6px 10px; font-size: 12px; }
+  .info { font-size: 11px; }
+}
 </style>
 </head>
 <body>
@@ -659,7 +677,7 @@ function setMode(mode) {
 
 function teachShelter() {
   canBuild = true;
-  document.getElementById("btn_shelter").textContent = "Shelter building \u2714";
+  document.getElementById("btn_shelter").textContent = "Shelter building ✔";
   document.getElementById("btn_shelter").classList.add("learned");
   logEvent("Learned shelter building", "#d4aa50");
 }
