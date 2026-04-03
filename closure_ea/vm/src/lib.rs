@@ -32,6 +32,7 @@ mod program;
 mod machine;
 mod hierarchy;
 pub mod generation;
+pub mod logic_gates;
 
 pub use closure_rs::groups::sphere::IDENTITY;
 pub use primitives::{DecomposeResult, decompose, StepResult};
