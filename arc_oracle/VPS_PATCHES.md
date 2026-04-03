@@ -83,3 +83,28 @@ ls20 L4: confirmed plan exists and works (43 actions). L5+ blocked by budget.
 tr87 L6: alter_rules + tree_translation. Solver generates plan but hasn't been
   verified against the live API. 32-action plan may fail if source parsing misses
   something the live engine has.
+
+## Patch 11: GAME_MAX_LEVELS cap + tr87 level counting fix (applied 2026-04-03)
+
+tr87 has 6 levels. Engine was attempting L7 (no_plan) and counting it in denominator.
+Added GAME_MAX_LEVELS = {tr87:6, g50t:7, ls20:7, wa30:9}.
+Level loop breaks when level > GAME_MAX_LEVELS[game].
+
+Score went from 19/23 (82.6%) to 19/22 (86.4%) — no new solves, just correct counting.
+
+## Blockers confirmed (2026-04-03)
+
+### wa30 L5 (6 boxes, budget=125)
+Lower bound = 124 actions (verified). Greedy + branch-and-bound (720 orderings,
+7062 nodes) finds no solution. Root cause: x=36 wall column has only 2 gaps
+(y=28, y=32). After 2 boxes placed in gap approach positions, remaining boxes
+have no carry paths. Requires non-greedy multi-box joint planning (TSP-style).
+
+### ls20 L5 (BFS plan fails, push bars reset state on death)
+l5_final_bfs.py finds 39-action plan using empirical transition table.
+Plan fails: death resets sh/co/ro to init values (confirmed from source).
+Single-life budget: 42/2 = 21 moves. 7 hits needed (sh×2, co×3, ro×2).
+BFS with single-life constraint: 1945 states, no solution.
+Level is geometrically unsolvable at this player start given push bar layout.
+
+## Final score: 19/22 levels solved (86.4%) — 2026-04-03
