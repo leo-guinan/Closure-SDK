@@ -48,6 +48,7 @@ from relational_encoder import (
     RelState, OracleBudget, MATCH_THRESHOLD, ORACLE_CALLS_PER_EPISODE
 )
 from offline_trainer import GameDNA, OfflineTrainer, DNA_DIR
+from normalized_encoder import CROSS_GAME_MATCH_THRESHOLD, WITHIN_GAME_MATCH_THRESHOLD
 
 # ── Trigger types ────────────────────────────────────────────────────────────
 
@@ -219,21 +220,22 @@ class RuntimeOracle:
         t0 = time.monotonic()
 
         # Two-phase query:
-        # Phase 1: primary key (self→world, cross-game)
-        # Phase 2: full key (all three words, within-game precision)
+        # Phase 1: within-game, full word (self+others+world), tight threshold
+        # Phase 2: cross-game, self_word only, loose threshold (near-goal signal)
         hit = self.dna.query(
             state,
             level=self._current_level,
-            threshold=self.threshold,
-            use_full_sigma=True,  # within-game: use all three words
+            threshold=WITHIN_GAME_MATCH_THRESHOLD,
+            use_full_sigma=True,
         )
 
-        # If full query misses, try primary-key only (cross-game fallback)
+        # Cross-game fallback: self_word only, looser threshold
+        # Only useful for near-goal states (clustering confirmed in normalized_encoder.py)
         if hit is None:
             hit = self.dna.query(
                 state,
-                level=None,  # any level
-                threshold=self.threshold * 1.5,  # looser threshold for cross-game
+                level=None,
+                threshold=CROSS_GAME_MATCH_THRESHOLD,
                 use_full_sigma=False,
             )
 

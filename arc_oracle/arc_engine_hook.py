@@ -53,8 +53,12 @@ import sys
 from typing import Any, List, Optional, Tuple
 
 from relational_encoder import (
-    RelState, OracleBudget,
-    encode_wa30_state, encode_ls20_state, encode_r11l_state, encode_from_frame,
+    RelState, OracleBudget, encode_from_frame,
+)
+from normalized_encoder import (
+    encode_wa30_normalized, encode_ls20_normalized,
+    encode_r11l_normalized, encode_sc25_normalized,
+    L3Constants, L3Registry, KNOWN_L3,
 )
 from runtime_oracle import RuntimeOracle, OraclePool, OracleTrigger, OracleResult
 from offline_trainer import DNA_DIR
@@ -66,46 +70,59 @@ def encode_wa30_live(
     player_rot: int,
     grabbed_box: Optional[Tuple[float, float]],
     box_positions: List[Tuple[float, float]],
-    goal_positions: List[Tuple[float, float]],
+    l3: Optional[L3Constants] = None,
     level: int = 0,
 ) -> RelState:
-    """Encode wa30 live state from arc_engine sensor data."""
-    return encode_wa30_state(
+    """Encode wa30 live state with L3 normalization."""
+    return encode_wa30_normalized(
         player_x=player_x, player_y=player_y,
         player_rot=player_rot, grabbed_box=grabbed_box,
-        box_positions=box_positions, goal_positions=goal_positions,
-        level=level,
+        box_positions=box_positions,
+        l3=l3, level=level,
     )
 
 
 def encode_ls20_live(
     player_x: float, player_y: float,
     player_rot: int,
-    goal_positions: List[Tuple[float, float]],
     pushbar_positions: List[Tuple[float, float]],
+    l3: Optional[L3Constants] = None,
     level: int = 0,
 ) -> RelState:
-    """Encode ls20 live state from arc_engine sensor data."""
-    return encode_ls20_state(
+    """Encode ls20 live state with L3 normalization."""
+    return encode_ls20_normalized(
         player_x=player_x, player_y=player_y,
         player_rot=player_rot,
-        goal_positions=goal_positions,
         pushbar_positions=pushbar_positions,
-        level=level,
+        l3=l3, level=level,
     )
 
 
 def encode_r11l_live(
     active_node_x: float, active_node_y: float,
-    target_x: float, target_y: float,
     other_nodes: List[Tuple[float, float]],
+    l3: Optional[L3Constants] = None,
     level: int = 0,
 ) -> RelState:
-    """Encode r11l live state."""
-    return encode_r11l_state(
+    """Encode r11l live state with L3 normalization."""
+    return encode_r11l_normalized(
         active_node_x=active_node_x, active_node_y=active_node_y,
-        target_x=target_x, target_y=target_y,
-        other_nodes=other_nodes, level=level,
+        other_nodes=other_nodes,
+        l3=l3, level=level,
+    )
+
+
+def encode_sc25_live(
+    player_x: float, player_y: float,
+    spell_selected: bool,
+    l3: Optional[L3Constants] = None,
+    level: int = 0,
+) -> RelState:
+    """Encode sc25 live state with L3 normalization."""
+    return encode_sc25_normalized(
+        player_x=player_x, player_y=player_y,
+        spell_selected=spell_selected,
+        l3=l3, level=level,
     )
 
 

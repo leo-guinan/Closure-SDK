@@ -68,8 +68,12 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from relational_encoder import (
     RelState, RelWord, RelCell,
-    encode_wa30_state, encode_ls20_state, encode_r11l_state,
     MATCH_THRESHOLD,
+)
+from normalized_encoder import (
+    encode_wa30_normalized, encode_ls20_normalized, encode_r11l_normalized,
+    L3Constants, KNOWN_L3, L3Registry,
+    CROSS_GAME_MATCH_THRESHOLD, WITHIN_GAME_MATCH_THRESHOLD,
 )
 
 DNA_DIR = os.path.join(os.path.dirname(__file__), "dna")
@@ -253,7 +257,13 @@ class OfflineTrainer:
         if len(dna) > 0 and not force:
             return 0
 
-        state = encode_wa30_state(level=1, **_WA30_L1_START)
+        s = _WA30_L1_START
+        state = encode_wa30_normalized(
+            player_x=s["player_x"], player_y=s["player_y"],
+            player_rot=s["player_rot"], grabbed_box=s["grabbed_box"],
+            box_positions=s["box_positions"],
+            level=1,
+        )
         dna.store(state, _WA30_L1_PLAN, level=1, source="confirmed_plan")
         self.trained["wa30"] = dna
         return 1
@@ -271,7 +281,12 @@ class OfflineTrainer:
         ]
         count = 0
         for level, start, plan in plans:
-            state = encode_ls20_state(level=level, **start)
+            state = encode_ls20_normalized(
+                player_x=start["player_x"], player_y=start["player_y"],
+                player_rot=start["player_rot"],
+                pushbar_positions=start["pushbar_positions"],
+                level=level,
+            )
             dna.store(state, plan, level=level, source="confirmed_plan")
             count += 1
         self.trained["ls20"] = dna
@@ -282,7 +297,12 @@ class OfflineTrainer:
         if len(dna) > 0 and not force:
             return 0
 
-        state = encode_r11l_state(level=0, **_R11L_L0_START)
+        s = _R11L_L0_START
+        state = encode_r11l_normalized(
+            active_node_x=s["active_node_x"], active_node_y=s["active_node_y"],
+            other_nodes=s["other_nodes"],
+            level=0,
+        )
         dna.store(state, _R11L_L0_PLAN, level=0, source="confirmed_plan")
         self.trained["r11l"] = dna
         return 1
