@@ -124,3 +124,36 @@ Plan that achieves 5/6 (125 actions):
 - Full sensor chain: (1,25)→mcipbohmmz relay→wueyxnzxaf switcher→swap (13,13)↔(13,25).
 
 ### Score: 21/24 (87.5%) — ceiling for this session
+
+## g50t L7 deep dive (2026-04-04 session 2) — UNRESOLVED
+
+### Architecture fully mapped
+- Win condition: player at (wt.x+1, wt.y+1) = (31,49)
+- Win approaches: (37,49)LEFT, (43,49)LEFT, (31,55)UP, (31,43)DOWN — all WIN=True
+- But all four approach positions are NOT on the walkable floor
+- Walkable floor (42 positions via center-check) has gaps:
+  - y=43 row: only x=1,19 walkable (x=7,13,25,31,37,43,49 = all gaps)
+  - y=49 row: only x=1,31,37,43,49 walkable (x=7,13,19,25 = gap)
+  - y=55 row: only x=1,7,13,19 walkable (bottom of left column)
+
+### The gap
+Win island = {(31,49),(37,49),(43,49),(49,49)} — completely disconnected from main area
+Main area reaches max y=43 only at x=1 and x=19
+(1,43) is accessible but (1,49) is far from win island (gap at x=7-25 in y=49)
+
+### What was tried
+- Ghost timer path: ghost navigates to (1,25) sensor but it's autonomous navigator, not sensor trigger
+- Sensor triggers: (19,37) moves qinemeqqdw from (1,37)↔(7,37) toggle — doesn't open new floor
+- Clone to (1,25): floor gap at (7,25) prevents clone reaching (1,25) from left
+- Obstacle removal: removing kjrcloicja movers doesn't expand accessible floor (floor is pixel-defined)
+
+### Unknown: what changes the floor topology
+The level MUST have a floor-expansion mechanic since win is mathematically unreachable otherwise.
+Candidates:
+- ushpjzbuyu (59x51 invisible sprite at (3,3)) — may become visible/active
+- Additional clone slot usage (ovhuyqtghw moves on A5)
+- akfoiqesdk sensor at (1,25) — what happens when a CLONE reaches (1,25)?
+  The clone can't cross (7,25) gap from main area.
+  But maybe the ghost reaching (1,25) triggers it differently?
+
+### Score: 21/24 — ceiling for two full sessions
