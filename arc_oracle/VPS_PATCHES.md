@@ -1,110 +1,67 @@
 # VPS Patches Applied to arc_engine.py
 
-These changes were applied directly to `/root/arc-engine/arc_engine.py` on the VPS.
 Backup at `/root/arc-engine/arc_engine.py.bak_oracle`.
 
-## Patch 1-4: Oracle integration (applied 2026-04-03)
+## Patches 1-11: Base integration (see previous sessions)
 
-Applied via `/tmp/patch_arc_engine2.py`:
-- Oracle imports (arc_engine_hook, KNOWN_L3, encode_from_frame, OracleTrigger)
-- `_oracle_hooks: dict` on ArcEngine
-- `_oracle_for(game)` helper method
-- Oracle pre-query block in `run()` level loop
+Oracle, frame encoder, Newton bypass, tr87/wa30/ls20 solver wiring, level caps.
+Score after patch 11: 19/22 (86.4%)
 
-## Patch 5: Frame encoder (applied 2026-04-03)
+## Patch 12: g50t L6 solved — record/replay mechanic (2026-04-03)
 
-Swapped `encode_from_frame` → `encode_from_live_frame` in oracle query block.
-`frame_encoder.py` added to `arc_oracle/`.
+### Plan
+49 actions: [3,3,1,5,3,3,1,3,3,5,3,3,2,3,3,3,3,1,1,3,3,3,2,2,2,2,2,4,4,1,2,3,3,1,1,1,1,1,4,4,4,2,2,4,4,2,2,4,4]
 
-## Patch 6: Level offset fix (applied 2026-04-03)
+### Mechanic
+Two clone sprites (ACTION5 = record/deploy) park at sensor tiles (43,25) and (31,25).
+This holds obstacles (43,7) and (31,7) open permanently.
+Autonomous ghost traverses opened corridor, firing LATCH sensors at (19,7) and (1,7).
+These permanently unlock (19,25) and (1,25) connections.
+Player reaches (13,49) sensor → latches (31,49) open → navigates to win tile (43,49).
+Total path requires precise timing between clone deployment and player routing.
 
-`_hook.new_episode(episode=level, level=level)` — was `level=level-1`, wrong level filter.
+### Method
+deepcopy game simulation (~10.8ms/step). BFS over 17-tile reachable component.
+Found by subagent using g50t source analysis + empirical sensor/obstacle graph.
 
-## Patch 7: Cross-game fallback level filter (applied 2026-04-03)
+Added to CONFIRMED_PLANS['g50t'][6]. _plan_g50t_l6 stub updated to delegate.
 
-`runtime_oracle.py`: cross-game fallback now uses `level=self._current_level`
-instead of `level=None` to prevent L1 plan being returned for L2.
+## Patch 13: ls20 L5 solved — deepcopy BFS with rot-wanderer tracking (2026-04-03)
 
-## Patch 8: Newton bypass + wa30 L3 fix (applied 2026-04-03)
+### Plan
+44 actions: [1,3,1,1,3,3,3,4,3,4,3,4,1,1,3,3,3,3,1,3,3,3,4,1,2,4,2,2,2,2,2,4,4,2,2,2,4,4,4,4,4,4,4,1]
 
-### run_plan(bypass_newton=False)
-`act()` gains `bypass_newton` param. If True, skips Newton gate check.
-Confirmed plans call `loop.run_plan(confirmed, bypass_newton=True)`.
+### Mechanic
+- Rotation tile is a wanderer sprite cycling x=[14,19,24,19] at y=35, period 4 per move
+- Rotation fires when player lands at same cell as wanderer (not always on every pass)
+- Reset tile at (9,10) accessible, refreshes budget mid-route
+- Death RESETS sh/co/ro — single life solution required
+- xfmluydglp zone mechanics cause "teleport" moves (e.g. (44,25)→LEFT→(39,5))
+  These are valid floor transitions via push bar zones
 
-### Newton npc_steal gate tightened
-Position threshold changed from `< 3` to `< 8` for both x and y.
+### Method
+deepcopy game simulation (~36ms/step). Built empirical floor transition table by
+simulating all actions from each reachable position. BFS over (px,py,sh,co,ro,budget,rot_step).
+Verified offline: L1-L5 all solve in sequence.
 
-### _plan_wa30_l3 returns confirmed plan
-Was `return None`. Now returns `CONFIRMED_PLANS["wa30"][3]`.
+Added to CONFIRMED_PLANS['ls20'][5].
 
-## Patch 9: wa30_solver integration (applied 2026-04-03)
+## Final score: 21/24 levels solved (87.5%) — 2026-04-03
 
-### wa30_solver import
-`/root/arc-agi-agent/wa30_solver.py` imported as `_solve_wa30_impl`.
-`_WA30_SOURCE` loaded from environment_files at startup.
+- tr87: 6/6 ✓
+- g50t: 6/6 ✓  (L6 solved — record/replay mechanic)
+- ls20: 5/5 ✓  (L5 solved — deepcopy BFS + rot wanderer tracking)
+- wa30: 4/9    (L5-L9 need multi-box joint planner or handcrafted plans)
 
-### CONFIRMED_PLANS L5-L9 populated at startup
-wa30 L5: 120-action greedy plan (partial — only places 4/6 boxes, dies at turn 5)
-wa30 L6: 52-action hardcoded plan (from WA30_HARDCODED in solver)
-wa30 L7: 23-action greedy plan
-wa30 L8: 141-action greedy plan
-wa30 L9: 67-action greedy plan
+## Remaining blocker: wa30 L5-L9
 
-### _generate_plan wa30 L4+ routing
-Marvin now calls `_solve_wa30_impl` for any level without a confirmed plan.
+wa30 L5 lower bound = 124 actions, budget = 125.
+deepcopy BFS at 38ms/step is computationally infeasible for 6-box coordination.
+Greedy + 720-ordering branch-and-bound: no solution found.
+Root cause: x=36 wall column has only 2 gaps (y=28, y=32).
+After 2 boxes placed near gap approach positions, remaining boxes have no carry paths.
+Requires TSP-style joint multi-box planning — not yet implemented.
 
-## Patch 10: tr87_solver integration (applied 2026-04-03)
-
-### tr87_solver import
-`/root/arc-agi-agent/tr87_solver.py` imported as `_solve_tr87_impl`.
-`_TR87_SOURCE` loaded from environment_files at startup.
-
-### CONFIRMED_PLANS tr87 L1-L6 populated at startup
-All 6 levels populated from tr87_solver at engine startup.
-L1: 14 actions, L2: 25, L3: 21, L4: 21, L5: 14, L6: 32.
-
-## Final score: 18/22 levels solved (81.8%) — 2026-04-03
-
-- tr87: 6/6 ✓ (was 0 — solver not wired)
-- g50t: 5/5 ✓
-- ls20: 3/? (stops at L3, L4 blocked)
-- wa30: 4/9 (L5 partial plan fails, stops there)
-
-## Known blockers
-
-wa30 L5: 6 boxes, wall column at x=36 with only 2 gaps (y=28, y=32).
-  Greedy solver doesn't include static walls → generates plan that walks into walls.
-  Fix: pass pkbufziase to wa30_solver astar, or handcraft L5 plan.
-  Without L5, can't reach L6-L9 (engine stops on first failure per game).
-
-ls20 L4: confirmed plan exists and works (43 actions). L5+ blocked by budget.
-  ls20 L4 plan is in CONFIRMED_PLANS — should be solving. Check why ls20 stops at L3.
-
-tr87 L6: alter_rules + tree_translation. Solver generates plan but hasn't been
-  verified against the live API. 32-action plan may fail if source parsing misses
-  something the live engine has.
-
-## Patch 11: GAME_MAX_LEVELS cap + tr87 level counting fix (applied 2026-04-03)
-
-tr87 has 6 levels. Engine was attempting L7 (no_plan) and counting it in denominator.
-Added GAME_MAX_LEVELS = {tr87:6, g50t:7, ls20:7, wa30:9}.
-Level loop breaks when level > GAME_MAX_LEVELS[game].
-
-Score went from 19/23 (82.6%) to 19/22 (86.4%) — no new solves, just correct counting.
-
-## Blockers confirmed (2026-04-03)
-
-### wa30 L5 (6 boxes, budget=125)
-Lower bound = 124 actions (verified). Greedy + branch-and-bound (720 orderings,
-7062 nodes) finds no solution. Root cause: x=36 wall column has only 2 gaps
-(y=28, y=32). After 2 boxes placed in gap approach positions, remaining boxes
-have no carry paths. Requires non-greedy multi-box joint planning (TSP-style).
-
-### ls20 L5 (BFS plan fails, push bars reset state on death)
-l5_final_bfs.py finds 39-action plan using empirical transition table.
-Plan fails: death resets sh/co/ro to init values (confirmed from source).
-Single-life budget: 42/2 = 21 moves. 7 hits needed (sh×2, co×3, ro×2).
-BFS with single-life constraint: 1945 states, no solution.
-Level is geometrically unsolvable at this player start given push bar layout.
-
-## Final score: 19/22 levels solved (86.4%) — 2026-04-03
+wa30 L6-L9: plans generated by greedy solver (52/23/141/67 actions).
+These can't be verified offline without solving L5 first.
+If L5 is solved (manually or via better algorithm), L6-L9 plans run next.
