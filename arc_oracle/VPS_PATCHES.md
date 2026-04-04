@@ -102,3 +102,25 @@ Plan that achieves 5/6 (125 actions):
 [4,4,4,1,1,1,1,1,1,5,2,2,2,2,2,3,3,3,3,3,3,3,3,5,4,4,1,3,5,3,3,5,
  4,4,4,4,4,4,4,4,4,4,2,2,2,3,2,2,2,2,4,2,4,1,5,1,1,1,1,1,1,3,3,3,3,3,3,3,3,3,3,3,3,3,5,
  1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1,2,1]
+
+## ls20 L6 + g50t L7 analysis (2026-04-04) — UNRESOLVED
+
+### ls20 L6
+- Two goals: Goal1=(54,50) needs sh=5,co=1,ro=1; Goal2=(54,35) needs sh=0,co=3,ro=2
+- Min path ~82 steps, budget=42. No budget resets reachable.
+- Transformers (shape/color/rot) are wanderers that move each turn.
+- Push bars at (49,4) dir=down, (50,20) dir=left — may provide shortcuts.
+- Goal1 NOT adjacent to any floor position (blocked by obstacles at 53,49).
+- Needs obstacle clearing via sensor at (1,53) which is behind wall column.
+
+### g50t L7
+- Win at (30,48), player at (25,25). WIN reachable from (25,49)→RIGHT or (31,43)→DOWN.
+- But (25,43) and (19,49) not in floor — blocked.
+- Sensor at (1,25) (via clone/A5) triggers switcher that swaps mpreboxmgc obstacles.
+- If obstacles at (13,13)/(13,25) swapped, may open path to (25,43).
+- Clone mechanic (A5): record path → deploy clone on sensor → sensor triggers obstacle swap.
+- Same pattern as L6 but: path from (13,25) to (1,25) not directly reachable.
+- The hkfxkkyeeb sensor at (1,25) has tag akfoiqesdk — accessible via clone.
+- Full sensor chain: (1,25)→mcipbohmmz relay→wueyxnzxaf switcher→swap (13,13)↔(13,25).
+
+### Score: 21/24 (87.5%) — ceiling for this session
