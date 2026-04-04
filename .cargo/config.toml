@@ -1,0 +1,10 @@
+# Build configuration for closure-sdk on macOS with system Python 3.11
+# Fixes pyo3 linker errors when building closure-vm (which depends on closure-rs)
+[target.aarch64-apple-darwin]
+rustflags = [
+    "-L", "/Library/Frameworks/Python.framework/Versions/3.11/lib",
+    "-lpython3.11",
+]
+
+[env]
+PYO3_PYTHON = "python3"

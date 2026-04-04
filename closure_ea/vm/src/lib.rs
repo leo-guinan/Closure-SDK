@@ -31,12 +31,30 @@ mod primitives;
 mod program;
 mod machine;
 mod hierarchy;
+pub mod generation;
+pub mod logic_gates;
+mod cell;
+mod word;
+mod arithmetic;
+mod logic;
+mod control;
+mod word_memory;
 
 pub use closure_rs::groups::sphere::IDENTITY;
 pub use primitives::{DecomposeResult, decompose, StepResult};
 pub use program::Program;
 pub use machine::Machine;
 pub use hierarchy::{HierarchicalMachine, ResonanceConfig};
+pub use generation::{Genome, LearnResult, GenerateResult, learn, generate};
+pub use cell::{
+    identity_geometry, CouplingState, EulerPlane, NeighborCoupling, PlaneRelation, SheetRelation, TwistSheet,
+    VerificationCell, VerificationLandmark,
+};
+pub use word::VerificationWord;
+pub use arithmetic::{FullAddOutput, FullSubtractOutput, VerificationArithmetic, WordSubtractionResult};
+pub use logic::{LogicObservation, VerificationLogic};
+pub use control::{BranchObservation, ComparisonObservation, VerificationControl};
+pub use word_memory::WordMemory;
 
 // ── Tests ───────────────────────────────────────────────────────────
 
@@ -55,6 +73,47 @@ mod tests {
         q
     }
 
+    fn binary_word(plane: EulerPlane, bits_msb: &str) -> VerificationWord {
+        let cells = bits_msb
+            .chars()
+            .rev()
+            .map(|ch| match ch {
+                '0' => VerificationArithmetic::zero(plane),
+                '1' => VerificationArithmetic::one(plane),
+                other => panic!("binary test word can only contain 0/1, got {other:?}"),
+            })
+            .collect();
+        VerificationWord::new(cells)
+    }
+
+    fn binary_string(word: &VerificationWord) -> String {
+        word.cells_le()
+            .iter()
+            .rev()
+            .map(|cell| match cell.landmark() {
+                VerificationLandmark::Identity => '0',
+                VerificationLandmark::Distinction => '1',
+                VerificationLandmark::Intermediate => '?',
+            })
+            .collect()
+    }
+
+    fn configured_cell(
+        plane: EulerPlane,
+        phase: f64,
+        turns: i64,
+        coherence_width: f64,
+        coupling_strength: f64,
+        coupling_phase_bias: f64,
+    ) -> VerificationCell {
+        VerificationCell::from_phase_turns_and_state(
+            plane,
+            phase,
+            turns,
+            coherence_width,
+            CouplingState::new(coupling_strength, coupling_phase_bias).unwrap(),
+        )
+    }
     // ── ISA: COMPOSE + INVERT ───────────────────────────────────────
 
     #[test]
@@ -1078,5 +1137,287 @@ mod tests {
         }
 
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+
+    #[test]
+    fn verification_cell_half_turn_reaches_distinction() {
+        let plane = EulerPlane::j();
+        let start = VerificationCell::identity(plane);
+        let opposite = start.advance(std::f64::consts::PI);
+
+        assert_eq!(opposite.landmark(), VerificationLandmark::Distinction);
+        assert!(opposite.geometry()[0] < -0.999999999);
+        assert_eq!(start.distinction_crossings_to(opposite).unwrap(), 1);
+        assert_eq!(start.return_crossings_to(opposite).unwrap(), 0);
+    }
+
+    #[test]
+    fn verification_cell_full_turn_returns_to_identity_without_losing_progress() {
+        let plane = EulerPlane::k();
+        let start = VerificationCell::identity(plane);
+        let returned = start.advance(std::f64::consts::TAU);
+
+        assert_eq!(returned.landmark(), VerificationLandmark::Identity);
+        assert!(returned.geometry()[0] > 0.999999999);
+        assert_eq!(start.return_crossings_to(returned).unwrap(), 1);
+        assert_eq!(start.distinction_crossings_to(returned).unwrap(), 1);
+        assert_eq!(start.phase(), 0.0);
+        assert_eq!(returned.phase(), 0.0);
+        assert_eq!(returned.turns(), 1);
+        assert_eq!(returned.sheet(), TwistSheet::Inverted);
+        assert!(!returned.is_plain_identity());
+    }
+
+    #[test]
+    fn verification_cell_two_full_turns_restore_same_sheet() {
+        let plane = EulerPlane::k();
+        let returned = VerificationCell::identity(plane).advance(2.0 * std::f64::consts::TAU);
+
+        assert_eq!(returned.landmark(), VerificationLandmark::Identity);
+        assert_eq!(returned.turns(), 2);
+        assert_eq!(returned.sheet(), TwistSheet::Direct);
+    }
+
+    #[test]
+    fn verification_cell_same_plane_composition_adds_phase_exactly() {
+        let plane = EulerPlane::i();
+        let a = VerificationCell::new(plane, std::f64::consts::PI / 3.0);
+        let b = VerificationCell::new(plane, std::f64::consts::PI / 2.0);
+        let composed = a.compose(b).unwrap();
+
+        assert!(composed.plane().matches(plane));
+        assert!((composed.phase() - (std::f64::consts::PI / 3.0 + std::f64::consts::PI / 2.0)).abs() < 1e-10);
+        let expected = compose(&a.geometry(), &b.geometry());
+        assert!(sigma(&compose(&composed.geometry(), &inverse(&expected))) < 1e-10);
+    }
+
+    #[test]
+    fn verification_cell_can_recover_from_geometry_when_plane_is_known() {
+        let plane = EulerPlane::new([1.0, 1.0, 0.0]).unwrap();
+        let cell = VerificationCell::new(plane, 1.7);
+        let restored = VerificationCell::from_geometry_on_plane(plane, &cell.geometry()).unwrap();
+
+        assert!(restored.plane().matches(plane));
+        assert!((restored.phase() - 1.7).abs() < 1e-10);
+    }
+
+    #[test]
+    fn verification_cell_general_composition_finds_new_plane() {
+        let a = VerificationCell::new(EulerPlane::i(), std::f64::consts::PI / 2.0);
+        let b = VerificationCell::new(EulerPlane::j(), std::f64::consts::PI / 2.0);
+        let composed = a.compose(b).unwrap();
+        let geometry = compose(&a.geometry(), &b.geometry());
+
+        assert!(sigma(&compose(&composed.geometry(), &inverse(&geometry))) < 1e-10);
+        assert!(!composed.plane().matches(EulerPlane::i()));
+        assert!(!composed.plane().matches(EulerPlane::j()));
+    }
+
+    #[test]
+    fn verification_cell_exposes_direction_turns_and_plane_relation() {
+        let a = VerificationCell::new(EulerPlane::i(), 2.5 * std::f64::consts::TAU);
+        let b = VerificationCell::new(EulerPlane::i(), -std::f64::consts::PI);
+        let c = VerificationCell::new(EulerPlane::j(), std::f64::consts::PI);
+
+        assert_eq!(a.completed_turns(), 2);
+        assert!(b.direction() < 0.0);
+        assert_eq!(a.plane_relation(b), PlaneRelation::Same);
+        assert_eq!(a.plane_relation(c), PlaneRelation::Orthogonal);
+    }
+
+    #[test]
+    fn verification_cell_preserves_coherence_and_coupling_through_composition() {
+        let plane = EulerPlane::i();
+        let left = configured_cell(plane, 0.0, 0, 0.25, 0.81, std::f64::consts::PI / 3.0);
+        let right = configured_cell(plane, std::f64::consts::PI, 1, 0.5, 0.36, std::f64::consts::PI / 6.0);
+        let composed = left.compose(right).unwrap();
+
+        assert!((composed.coherence_width() - (0.25_f64.powi(2) + 0.5_f64.powi(2)).sqrt()).abs() < 1e-10);
+        assert!((composed.coupling().strength() - (0.81_f64 * 0.36_f64).sqrt()).abs() < 1e-10);
+        assert!((composed.coupling().phase_bias() - (std::f64::consts::PI / 4.0)).abs() < 1e-10);
+    }
+
+    #[test]
+    fn verification_cell_reports_neighbor_coupling() {
+        let left = configured_cell(EulerPlane::i(), 0.0, 0, 0.1, 0.64, 0.0);
+        let right = configured_cell(EulerPlane::j(), std::f64::consts::PI, 1, 0.2, 0.25, std::f64::consts::PI / 2.0);
+        let relation = left.coupling_to(right);
+
+        assert_eq!(relation.plane_relation, PlaneRelation::Orthogonal);
+        assert_eq!(relation.sheet_relation, SheetRelation::Flipped);
+        assert!((relation.phase_offset - std::f64::consts::PI).abs() < 1e-10);
+        assert!(relation.coherence_overlap > 0.0);
+        assert!(relation.effective_strength > 0.0);
+    }
+
+    #[test]
+    fn verification_word_memory_roundtrip_preserves_planes_phase_and_twist() {
+        use closure_rs::table::Table;
+
+        let dir = std::env::temp_dir().join("verification_word_memory");
+        let _ = std::fs::remove_dir_all(&dir);
+
+        let mut table = Table::create(&dir, WordMemory::table_schema()).unwrap();
+        let word = VerificationWord::new(vec![
+            configured_cell(EulerPlane::i(), 0.0, 0, 0.05, 0.9, 0.0),
+            configured_cell(EulerPlane::j(), std::f64::consts::PI, 0, 0.15, 0.7, std::f64::consts::PI / 7.0),
+            configured_cell(EulerPlane::new([1.0, 1.0, 1.0]).unwrap(), 2.25, 3, 0.4, 0.5, std::f64::consts::PI / 5.0),
+        ]);
+        WordMemory::save_word(&mut table, b"rotor", &word).unwrap();
+        let restored = WordMemory::load_word(&mut table, b"rotor").unwrap();
+
+        assert_eq!(restored.len(), 3);
+        for (original, loaded) in word.cells_le().iter().zip(restored.cells_le()) {
+            assert!(original.plane().matches(loaded.plane()));
+            assert!((original.phase() - loaded.phase()).abs() < 1e-10);
+            assert_eq!(original.turns(), loaded.turns());
+            assert_eq!(original.sheet(), loaded.sheet());
+            assert!((original.coherence_width() - loaded.coherence_width()).abs() < 1e-10);
+            assert!((original.coupling().strength() - loaded.coupling().strength()).abs() < 1e-10);
+            assert!((original.coupling().phase_bias() - loaded.coupling().phase_bias()).abs() < 1e-10);
+        }
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn rotor_full_add_matches_half_turn_accumulation() {
+        let plane = EulerPlane::i();
+        let zero = VerificationArithmetic::zero(plane);
+        let one = VerificationArithmetic::one(plane);
+
+        let cases = [
+            (zero, zero, zero, 0.0, zero, zero, 0),
+            (zero, zero, one, std::f64::consts::PI, one, zero, 0),
+            (zero, one, zero, std::f64::consts::PI, one, zero, 0),
+            (one, zero, zero, std::f64::consts::PI, one, zero, 0),
+            (one, one, zero, 2.0 * std::f64::consts::PI, zero, one, 1),
+            (one, zero, one, 2.0 * std::f64::consts::PI, zero, one, 1),
+            (zero, one, one, 2.0 * std::f64::consts::PI, zero, one, 1),
+            (one, one, one, 3.0 * std::f64::consts::PI, one, one, 1),
+        ];
+
+        for (left, right, carry_in, total_phase, expected_sum, expected_carry, expected_cycles) in cases {
+            let out = VerificationArithmetic::full_add(left, right, carry_in).unwrap();
+            assert!((out.total_phase - total_phase).abs() < 1e-10);
+            assert_eq!(out.sum, expected_sum);
+            assert_eq!(out.carry, expected_carry);
+            assert_eq!(out.completed_cycles, expected_cycles);
+            assert_eq!(out.state.turns(), expected_cycles);
+            assert!(out.state.coherence_width() >= 0.0);
+        }
+    }
+
+    #[test]
+    fn rotor_logic_matches_residue_and_cycle_completion() {
+        let plane = EulerPlane::i();
+        let zero = VerificationArithmetic::zero(plane);
+        let one = VerificationArithmetic::one(plane);
+
+        let xor_10 = VerificationLogic::xor(one, zero).unwrap();
+        assert_eq!(xor_10.output, one);
+        assert!((xor_10.total_phase - std::f64::consts::PI).abs() < 1e-10);
+        assert_eq!(xor_10.completed_cycles, 0);
+        assert_eq!(xor_10.state.turns(), 0);
+
+        let xor_11 = VerificationLogic::xor(one, one).unwrap();
+        assert_eq!(xor_11.output, zero);
+        assert!((xor_11.total_phase - 2.0 * std::f64::consts::PI).abs() < 1e-10);
+        assert_eq!(xor_11.state.sheet(), TwistSheet::Inverted);
+
+        let and_11 = VerificationLogic::and(one, one).unwrap();
+        assert_eq!(and_11.output, one);
+        assert_eq!(and_11.completed_cycles, 1);
+        assert_eq!(and_11.state.turns(), 1);
+
+        let and_10 = VerificationLogic::and(one, zero).unwrap();
+        assert_eq!(and_10.output, zero);
+        assert_eq!(and_10.completed_cycles, 0);
+
+        let not_0 = VerificationLogic::not(zero);
+        let not_1 = VerificationLogic::not(one);
+        assert_eq!(not_0.output, one);
+        assert_eq!(not_1.output.landmark(), VerificationLandmark::Identity);
+
+        let or_10 = VerificationLogic::or(one, zero).unwrap();
+        let or_11 = VerificationLogic::or(one, one).unwrap();
+        assert_eq!(or_10.output, one);
+        assert_eq!(or_11.output, one);
+        assert!(or_11.state.coherence_width() >= 0.0);
+    }
+
+    #[test]
+    fn rotor_full_subtract_matches_cycle_borrow_rule() {
+        let plane = EulerPlane::j();
+        let zero = VerificationArithmetic::zero(plane);
+        let one = VerificationArithmetic::one(plane);
+
+        let cases = [
+            (zero, zero, zero, 0.0, zero, zero, 0),
+            (zero, zero, one, -std::f64::consts::PI, one, one, 1),
+            (zero, one, zero, -std::f64::consts::PI, one, one, 1),
+            (zero, one, one, -2.0 * std::f64::consts::PI, zero, one, 1),
+            (one, zero, zero, std::f64::consts::PI, one, zero, 0),
+            (one, zero, one, 0.0, zero, zero, 0),
+            (one, one, zero, 0.0, zero, zero, 0),
+            (one, one, one, -std::f64::consts::PI, one, one, 1),
+        ];
+
+        for (left, right, borrow_in, raw_phase, expected_difference, expected_borrow, expected_cycles) in cases {
+            let out = VerificationArithmetic::full_subtract(left, right, borrow_in).unwrap();
+            assert!((out.raw_phase - raw_phase).abs() < 1e-10);
+            assert_eq!(out.difference, expected_difference);
+            assert_eq!(out.borrow, expected_borrow);
+            assert_eq!(out.borrow_cycles, expected_cycles);
+            assert_eq!(out.state.turns(), expected_cycles);
+        }
+    }
+
+    #[test]
+    fn rotor_word_addition_uses_remainder_and_overflow() {
+        let plane = EulerPlane::k();
+        let left = binary_word(plane, "1011");
+        let right = binary_word(plane, "0110");
+        let sum = VerificationArithmetic::add_words(&left, &right).unwrap();
+
+        assert_eq!(binary_string(&sum), "10001");
+        assert_eq!(sum.cell(0).unwrap().turns(), 0);
+        assert_eq!(sum.cell(1).unwrap().turns(), 1);
+        assert_eq!(sum.cell(2).unwrap().turns(), 1);
+        assert_eq!(sum.cell(3).unwrap().turns(), 1);
+        assert_eq!(sum.cell(1).unwrap().sheet(), TwistSheet::Inverted);
+    }
+
+    #[test]
+    fn rotor_word_subtraction_uses_cycle_borrow() {
+        let plane = EulerPlane::k();
+        let left = binary_word(plane, "1101");
+        let right = binary_word(plane, "0110");
+        let out = VerificationArithmetic::subtract_words(&left, &right).unwrap();
+
+        assert_eq!(binary_string(&out.difference), "111");
+        assert_eq!(out.borrow_out, VerificationArithmetic::zero(plane));
+    }
+
+    #[test]
+    fn rotor_counter_increment_and_decrement_roundtrip() {
+        let plane = EulerPlane::i();
+        let start = binary_word(plane, "101");
+        let incremented = VerificationArithmetic::increment_word(&start).unwrap();
+        let decremented = VerificationArithmetic::decrement_word(&incremented).unwrap();
+
+        assert_eq!(binary_string(&incremented), "110");
+        assert_eq!(binary_string(&decremented.difference), "101");
+        assert_eq!(decremented.borrow_out, VerificationArithmetic::zero(plane));
+    }
+
+    #[test]
+    fn control_layer_is_explicitly_blocked_until_rederived() {
+        let plane = EulerPlane::i();
+        let left = binary_word(plane, "10");
+        let right = binary_word(plane, "01");
+
+        assert!(VerificationControl::compare_words(&left, &right).is_err());
     }
 }

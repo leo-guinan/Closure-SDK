@@ -1,6 +1,10 @@
 # Ignore everything, allowlist what ships
 *
 
+# Cargo workspace config (local build overrides)
+!.cargo/
+!.cargo/config.toml
+
 # CI
 !.github/
 !.github/workflows/
@@ -59,6 +63,10 @@
 !closure_cli/reader.py
 !closure_cli/seeker.py
 
+# ─── arc_oracle (ARC-AGI-3 relational oracle) ────────────────────────
+!arc_oracle/
+!arc_oracle/**
+
 # ─── closure_ea (computer umbrella: dna + vm + demos) ───────────────
 !closure_ea/
 !closure_ea/README.md
@@ -68,6 +76,8 @@
 !closure_ea/dna/**
 !closure_ea/vm/
 !closure_ea/vm/**
+!closure_ea/generation/
+!closure_ea/generation/**
 !closure_ea/enkidu_alive/
 !closure_ea/enkidu_alive/**
 !closure_ea/archive/
@@ -119,3 +129,5 @@ closure_ea/**/.pytest_cache/
 closure_ea/vm/target/
 closure_ea/dna/**/*.lock
 closure_ea/dna/demo/coffee_store/output/
+
+!.github/workflows/pages.yml
